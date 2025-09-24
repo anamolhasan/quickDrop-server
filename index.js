@@ -69,7 +69,7 @@ async function run() {
         }
 
         // Check if user already exists
-        const existingUser = await usercollection.findOne({ email });
+        const existingUser = await userCollection.findOne({ email });
         if (existingUser) {
           return res.status(400).send({ error: "User already exists" });
         }
@@ -84,7 +84,7 @@ async function run() {
           createdAt: new Date()
         };
 
-        const result = await usercollection.insertOne(newUser);
+        const result = await userCollection.insertOne(newUser);
         
         res.status(201).send({
           success: true,
