@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const app = express()
 const cors = require('cors')
+const bcrypt = require('bcrypt')
 const port = process.env.PORT || 5000
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
@@ -10,7 +11,6 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 // middleware
 app.use(cors())
 app.use(express.json())
-
 
 
 
@@ -34,12 +34,43 @@ async function run() {
     const usercollection = db.collection('users')
 
 
-    app.post("/users", async(req,res)=>{
-      const newUser = req.body
-      const result = await usercollection.insertOne(newUser)
-      res.send(result)
-    })
+   app.post("/users", async (req, res) => {
+      try {
+        const { name, email, password, photo } = req.body; // photo is URL from frontend
+        
+        if (!name || !email || !password) {
+          return res.status(400).send({ error: "name, email, password required" });
+        }
 
+        // Check if user already exists
+        const existingUser = await usercollection.findOne({ email });
+        if (existingUser) {
+          return res.status(400).send({ error: "User already exists" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newUser = {
+          name,
+          email,
+          password: hashedPassword,
+          photo: photo || null, // Photo URL from ImgBB (or null)
+          createdAt: new Date()
+        };
+
+        const result = await usercollection.insertOne(newUser);
+        
+        res.status(201).send({
+          success: true,
+          userId: result.insertedId,
+          message: "User created successfully"
+        });
+        
+      } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).send({ error: 'Failed to create user' });
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
@@ -48,6 +79,11 @@ async function run() {
     // Ensures that the client will close when you finish/error
     // await client.close();
   }
+  
+
+ 
+
+
 }
 run().catch(console.dir);
 
