@@ -32,7 +32,7 @@ async function run() {
     
     const db = client.db('QdropDB');
     const userCollection = db.collection('users')
-    const usersFeedbackCollection =db.client('feedback')
+    const usersFeedbackCollection =db.collection('feedback')
 
 
     app.post("/users", async(req,res)=>{
@@ -43,11 +43,18 @@ async function run() {
 
 
 
-    // user Feedback 
+    // user Feedback -----------
+    // feedback (GET)
+    app.get('/feedback', async(req, res) => {
+      const result = await usersFeedbackCollection.find().toArray()
+      res.send(result)
+    })
+
+    // feedback (POST)
     app.post('/feedback', async(req, res) => {
       const newFeedback = req.body
       const result = await usersFeedbackCollection.insertOne(newFeedback)
-      
+
       res.send(result)
     })
 
