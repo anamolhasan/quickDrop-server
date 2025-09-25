@@ -14,6 +14,15 @@ app.use(express.json())
 
 
 
+app.use(cors({
+  origin: "http://localhost:3000", // your Next.js frontend
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
+
+
+
 const uri = process.env.DB_URL
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -36,11 +45,11 @@ async function run() {
 
 
 
-    app.post("/users", async(req,res)=>{
-      const newUser = req.body
-      const result = await userCollection.insertOne(newUser)
-      res.send(result)
-    })
+    // app.post("/users", async(req,res)=>{
+    //   const newUser = req.body
+    //   const result = await userCollection.insertOne(newUser)
+    //   res.send(result)
+    // })
 
 
 
@@ -103,7 +112,7 @@ async function run() {
 
 
    app.get('/users', async(req, res)=> {
-       const users = await usercollection.find({}).toArray()
+       const users = await userCollection.find({}).toArray()
        res.send(users)
    })
 
@@ -121,7 +130,7 @@ async function run() {
       return res.status(400).send({ error: "Email and password required" });
     }
 
-    const user = await usercollection.findOne({ email });
+    const user = await userCollection.findOne({ email });
 
     if(!user) {
       return res.status(400).send({ error: "Invalid email or password" });
