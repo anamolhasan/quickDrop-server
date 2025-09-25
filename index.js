@@ -31,7 +31,33 @@ async function run() {
     await client.connect();
     
     const db = client.db('QdropDB');
-    const usercollection = db.collection('users')
+    const userCollection = db.collection('users')
+    const usersFeedbackCollection =db.collection('feedback')
+
+
+
+    app.post("/users", async(req,res)=>{
+      const newUser = req.body
+      const result = await userCollection.insertOne(newUser)
+      res.send(result)
+    })
+
+
+
+    // user Feedback -----------
+    // feedback (GET)
+    app.get('/feedback', async(req, res) => {
+      const result = await usersFeedbackCollection.find().toArray()
+      res.send(result)
+    })
+
+    // feedback (POST)
+    app.post('/feedback', async(req, res) => {
+      const newFeedback = req.body
+      const result = await usersFeedbackCollection.insertOne(newFeedback)
+
+      res.send(result)
+    })
 
 
    app.post("/users", async (req, res) => {
@@ -43,7 +69,7 @@ async function run() {
         }
 
         // Check if user already exists
-        const existingUser = await usercollection.findOne({ email });
+        const existingUser = await userCollection.findOne({ email });
         if (existingUser) {
           return res.status(400).send({ error: "User already exists" });
         }
@@ -60,7 +86,7 @@ async function run() {
           
         };
 
-        const result = await usercollection.insertOne(newUser);
+        const result = await userCollection.insertOne(newUser);
         
         res.status(201).send({
           success: true,
@@ -73,6 +99,7 @@ async function run() {
         res.status(500).send({ error: 'Failed to create user' });
       }
     });
+
 
 
    app.get('/users', async(req, res)=> {
