@@ -63,7 +63,7 @@ async function run() {
    app.post("/users", async (req, res) => {
       try {
         const { name, email, password, photo } = req.body; // photo is URL from frontend
-        
+
         if (!name || !email || !password) {
           return res.status(400).send({ error: "name, email, password required" });
         }
@@ -80,8 +80,10 @@ async function run() {
           name,
           email,
           password: hashedPassword,
-          photo: photo || null, // Photo URL from ImgBB (or null)
+          photo: photo || "https://i.ibb.co/2n8qPkw/default-avatar.png",
+          role: "user",       
           createdAt: new Date()
+          
         };
 
         const result = await userCollection.insertOne(newUser);
@@ -97,6 +99,57 @@ async function run() {
         res.status(500).send({ error: 'Failed to create user' });
       }
     });
+
+
+
+   app.get('/users', async(req, res)=> {
+       const users = await usercollection.find({}).toArray()
+       res.send(users)
+   })
+
+
+
+
+
+
+
+   app.post("/login", async(req, res)=> {
+  try{
+    const { email, password } = req.body;
+
+    if(!email || !password) {
+      return res.status(400).send({ error: "Email and password required" });
+    }
+
+    const user = await usercollection.findOne({ email });
+
+    if(!user) {
+      return res.status(400).send({ error: "Invalid email or password" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if(!isPasswordValid) {
+      return res.status(401).send({ error: "Invalid email or password" });
+    }
+
+    res.send({
+      success: true,
+      message: "Login success",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        photo: user.photo || "https://i.ibb.co/2n8qPkw/default-avatar.png", 
+        role: user.role
+      }
+    });
+
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).send({ error: "Login failed" });
+  }
+});
 
 
     // Send a ping to confirm a successful connection
