@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const app = express()
 const cors = require('cors')
+const bcrypt = require('bcrypt')
 const port = process.env.PORT || 5000
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
@@ -10,7 +11,6 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 // middleware
 app.use(cors())
 app.use(express.json())
-
 
 
 
@@ -31,14 +31,125 @@ async function run() {
     await client.connect();
     
     const db = client.db('QdropDB');
-    const usercollection = db.collection('users')
+    const userCollection = db.collection('users')
+    const usersFeedbackCollection =db.collection('feedback')
+
 
 
     app.post("/users", async(req,res)=>{
       const newUser = req.body
-      const result = await usercollection.insertOne(newUser)
+      const result = await userCollection.insertOne(newUser)
       res.send(result)
     })
+
+
+
+    // user Feedback -----------
+    // feedback (GET)
+    app.get('/feedback', async(req, res) => {
+      const result = await usersFeedbackCollection.find().toArray()
+      res.send(result)
+    })
+
+    // feedback (POST)
+    app.post('/feedback', async(req, res) => {
+      const newFeedback = req.body
+      const result = await usersFeedbackCollection.insertOne(newFeedback)
+
+      res.send(result)
+    })
+
+
+   app.post("/users", async (req, res) => {
+      try {
+        const { name, email, password, photo } = req.body; // photo is URL from frontend
+
+        if (!name || !email || !password) {
+          return res.status(400).send({ error: "name, email, password required" });
+        }
+
+        // Check if user already exists
+        const existingUser = await userCollection.findOne({ email });
+        if (existingUser) {
+          return res.status(400).send({ error: "User already exists" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newUser = {
+          name,
+          email,
+          password: hashedPassword,
+          photo: photo || "https://i.ibb.co/2n8qPkw/default-avatar.png",
+          role: "user",       
+          createdAt: new Date()
+          
+        };
+
+        const result = await userCollection.insertOne(newUser);
+        
+        res.status(201).send({
+          success: true,
+          userId: result.insertedId,
+          message: "User created successfully"
+        });
+        
+      } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).send({ error: 'Failed to create user' });
+      }
+    });
+
+
+
+   app.get('/users', async(req, res)=> {
+       const users = await usercollection.find({}).toArray()
+       res.send(users)
+   })
+
+
+
+
+
+
+
+   app.post("/login", async(req, res)=> {
+  try{
+    const { email, password } = req.body;
+
+    if(!email || !password) {
+      return res.status(400).send({ error: "Email and password required" });
+    }
+
+    const user = await usercollection.findOne({ email });
+
+    if(!user) {
+      return res.status(400).send({ error: "Invalid email or password" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if(!isPasswordValid) {
+      return res.status(401).send({ error: "Invalid email or password" });
+    }
+
+    res.send({
+      success: true,
+      message: "Login success",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        photo: user.photo || "https://i.ibb.co/2n8qPkw/default-avatar.png", 
+        role: user.role
+      }
+    });
+
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).send({ error: "Login failed" });
+  }
+});
 
 
     // Send a ping to confirm a successful connection
@@ -48,6 +159,11 @@ async function run() {
     // Ensures that the client will close when you finish/error
     // await client.close();
   }
+  
+
+ 
+
+
 }
 run().catch(console.dir);
 
