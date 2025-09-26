@@ -15,7 +15,7 @@ app.use(express.json())
 
 
 app.use(cors({
-  origin: "http://localhost:3000", // your Next.js frontend
+   origin: ["http://localhost:3000", "https://quick-drop-six.vercel.app"],
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true
 }));
