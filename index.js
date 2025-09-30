@@ -38,6 +38,7 @@ async function run() {
     const db = client.db("QdropDB");
     const userCollection = db.collection("users");
     const usersFeedbackCollection = db.collection("feedback");
+    const ridersCollection = db.collection("riders");
 
     // app.post("/users", async(req,res)=>{
     //   const newUser = req.body
@@ -173,6 +174,134 @@ app.patch("/users/:id/role", async (req, res) => {
     res.status(500).send({ error: "Failed to update role" });
   }
 });
+
+
+
+// rider applications: 
+
+
+app.post("/riders", async (req, res) => {
+  try {
+
+    const newRider = {
+      ...req.body,
+      status: "pending", // default status
+      createdAt: new Date(),
+    };
+
+    const result = await ridersCollection.insertOne(newRider);
+
+    res.status(201).json({
+      success: true,
+      message: "Rider application submitted successfully",
+      riderId: result.insertedId,
+    });
+  } catch (error) {
+    console.error("Error submitting rider:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+// GET all riders
+app.get("/riders", async (req, res) => {
+  try {
+    const riders = await ridersCollection.find().toArray();
+    res.json(riders);
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to fetch riders" });
+  }
+});
+
+
+
+
+
+
+
+
+
+// GET single rider by ID
+app.get("/riders/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rider = await ridersCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!rider) {
+      return res.status(404).json({ success: false, message: "Rider not found" });
+    }
+
+    res.json(rider);
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to fetch rider" });
+  }
+});
+
+
+
+// UPDATE rider status (accept / reject)
+app.put("/riders/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const result = await ridersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: status, updatedAt: new Date() } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ success: false, message: "Rider not found" });
+    }
+
+    res.json({ success: true, message: "Rider status updated successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to update rider" });
+  }
+});
+
+
+
+
+
+
+
+// DELETE rider
+app.delete("/riders/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await ridersCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "Rider not found" });
+    }
+
+    res.json({ success: true, message: "Rider deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to delete rider" });
+  }
+});
+
+
+
+
+
+
+// GET all active riders
+app.get("/riders/active", async (req, res) => {
+  try {
+    const activeRiders = await ridersCollection.find({ status: "accepted" }).toArray();
+    console.log("Active riders fetched:", activeRiders); // DEBUG
+    res.json(activeRiders);
+  } catch (error) {
+    console.error("Error fetching active riders:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch active riders" });
+  }
+});
+
+
 
 
 
