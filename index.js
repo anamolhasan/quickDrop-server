@@ -17,7 +17,11 @@ app.use(express.json());
 
 
 app.use(cors({
+<<<<<<< HEAD
    origin: ["http://localhost:3000", "https://quick-drop-six.vercel.app"],
+=======
+    origin: ["http://localhost:3000", "https://quick-drop-six.vercel.app"],
+>>>>>>> main
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true
 }));
