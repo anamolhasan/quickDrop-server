@@ -164,18 +164,47 @@ app.get("/users/:email", async (req, res) => {
 
     /** ------------------ FEEDBACK ------------------ **/
 
-    app.get("/feedback", async (req, res) => {
-      const result = await usersFeedbackCollection.find().toArray();
-      res.send(result);
-    });
+// GET all feedback
+app.get("/feedback", async (req, res) => {
+  try {
+    const result = await feedbackCollection.find().toArray();
+    res.send(result);
+  } catch (err) {
+    console.error("Error fetching feedback:", err);
+    res.status(500).send({ error: "Failed to fetch feedback" });
+  }
+});
 
-    // feedback (POST)
-    app.post("/feedback", async (req, res) => {
-      const newFeedback = req.body;
-      const result = await usersFeedbackCollection.insertOne(newFeedback);
+// POST new feedback
+app.post("/feedback", async (req, res) => {
+  try {
+    const newFeedback = req.body;
+    const result = await feedbackCollection.insertOne(newFeedback);
+    res.send({ success: true, insertedId: result.insertedId });
+  } catch (err) {
+    console.error("Error inserting feedback:", err);
+    res.status(500).send({ error: "Failed to add feedback" });
+  }
+});
 
-      res.send(result);
-    });
+// DELETE feedback
+app.delete("/feedback/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!ObjectId.isValid(id)) return res.status(400).send({ error: "Invalid feedback ID" });
+
+    const result = await feedbackCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) return res.status(404).send({ error: "Feedback not found" });
+
+    res.send({ success: true, message: "Feedback deleted" });
+  } catch (err) {
+    console.error("Error deleting feedback:", err);
+    res.status(500).send({ error: "Failed to delete feedback" });
+  }
+});
+
+
 
     /** ------------------ RIDERS ------------------ **/
 
