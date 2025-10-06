@@ -12,9 +12,6 @@ const port = process.env.PORT || 5000;
 // app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 app.use(express.json());
 
-<<<<<<<<< Temporary merge branch 1
-
-
 app.use(cors({
     origin: ["http://localhost:3000", "https://quick-drop-six.vercel.app"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -25,9 +22,9 @@ app.use(cors({
 // const uri = process.env.DB_URL
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
-=========
+
 const uri = process.env.DB_URL;
->>>>>>>>> Temporary merge branch 2
+
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
