@@ -49,6 +49,10 @@ async function run() {
     const feedbackCollection = db.collection("feedback");
     const ridersCollection = db.collection("riders");
 
+   
+
+   
+
     /** ------------------ USERS ------------------ **/
 
     // Create user
@@ -132,6 +136,52 @@ app.post("/login/social", async (req, res) => {
 
 
 
+  // Update user profile (logged-in user)
+
+
+//   app.patch("/users/profile", verifyToken, async (req, res) => {
+//   const { name, email, phone, address } = req.body;
+//   const userEmail = req.user.email; // from your verifyToken middleware
+
+//   try {
+//     const updateFields = {};
+//     if (name) updateFields.name = name;
+//     if (email) updateFields.email = email;
+//     if (phone) updateFields.phone = phone;
+//     if (address) updateFields.address = address;
+
+//     const result = await userCollection.updateOne(
+//       { email: userEmail }, // use email instead of ObjectId
+//       { $set: updateFields }
+//     );
+
+//     if (result.modifiedCount === 0)
+//       return res.status(404).json({ success: false, message: "User not found or no changes made" });
+
+//     const updatedUser = await userCollection.findOne({ email: userEmail });
+
+//     res.json({ success: true, message: "Profile updated successfully", user: updatedUser });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Failed to update profile" });
+//   }
+// });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // Update user role (Admin only)
     app.patch("/users/:id/role", verifyToken, authorizeRoles("admin"), async (req, res) => {
@@ -181,6 +231,37 @@ app.get("/users/:email", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+
+
+
+
+// DELETE user (Admin only)
+app.delete("/users/:id", verifyToken, authorizeRoles("admin"), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "Invalid user ID" });
+    }
+
+    const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ success: false, error: "Failed to delete user" });
+  }
+});
+
+
+
+
+
 
 
     /** ------------------ FEEDBACK ------------------ **/
@@ -236,17 +317,25 @@ app.delete("/feedback/:id", async (req, res) => {
       res.status(201).json({ success: true, riderId: result.insertedId, message: "Rider application submitted successfully" });
     });
 
+
+
     // Get all riders (Admin only)
     app.get("/riders", verifyToken, authorizeRoles("admin"), async (req, res) => {
       const riders = await ridersCollection.find().toArray();
       res.json(riders);
     });
 
+
+
+
     // Get active riders (Any logged-in user)
     app.get("/riders/active", verifyToken, async (req, res) => {
       const activeRiders = await ridersCollection.find({ status: "accepted" }).toArray();
       res.json(activeRiders);
     });
+
+
+
 
     // Update rider status (Admin only)
     app.put("/riders/:id", verifyToken, authorizeRoles("admin"), async (req, res) => {
@@ -257,7 +346,10 @@ app.delete("/feedback/:id", async (req, res) => {
       res.json({ success: true, message: "Rider status updated successfully" });
     });
 
+
+
     // Delete rider (Admin only)
+
     app.delete("/riders/:id", verifyToken, authorizeRoles("admin"), async (req, res) => {
       const { id } = req.params;
       const result = await ridersCollection.deleteOne({ _id: new ObjectId(id) });
@@ -265,13 +357,24 @@ app.delete("/feedback/:id", async (req, res) => {
       res.json({ success: true, message: "Rider deleted successfully" });
     });
 
+
+
     // Get single rider (Any logged-in user)
+  
     app.get("/riders/:id", verifyToken, async (req, res) => {
       const { id } = req.params;
       const rider = await ridersCollection.findOne({ _id: new ObjectId(id) });
       if (!rider) return res.status(404).json({ success: false, message: "Rider not found" });
       res.json(rider);
     });
+
+
+
+
+
+    
+
+
 
     console.log("Backend connected to MongoDB successfully!");
   } finally {
