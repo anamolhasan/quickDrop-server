@@ -131,9 +131,6 @@ async function run() {
 
     // POST /login/social
 
-<<<<<<< HEAD
-    app.post("/login/social", async (req, res) => {
-=======
 
 
 
@@ -210,7 +207,6 @@ app.post("/login/social", async (req, res) => {
       const { role } = req.body;
       if (!role) return res.status(400).send({ error: "Role is required" });
 
->>>>>>> 2512b7ae44a91a65eb85ba0c08f5f1a979154069
       try {
         const { email } = req.body;
         const user = await userCollection.findOne({ email });
@@ -449,24 +445,6 @@ app.delete("/users/:id", verifyToken, authorizeRoles("admin"), async (req, res) 
 
 
     // Delete rider (Admin only)
-<<<<<<< HEAD
-    app.delete(
-      "/riders/:id",
-      verifyToken,
-      authorizeRoles("admin"),
-      async (req, res) => {
-        const { id } = req.params;
-        const result = await ridersCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        if (result.deletedCount === 0)
-          return res
-            .status(404)
-            .json({ success: false, message: "Rider not found" });
-        res.json({ success: true, message: "Rider deleted successfully" });
-      }
-    );
-=======
 
     app.delete("/riders/:id", verifyToken, authorizeRoles("admin"), async (req, res) => {
       const { id } = req.params;
@@ -474,7 +452,6 @@ app.delete("/users/:id", verifyToken, authorizeRoles("admin"), async (req, res) 
       if (result.deletedCount === 0) return res.status(404).json({ success: false, message: "Rider not found" });
       res.json({ success: true, message: "Rider deleted successfully" });
     });
->>>>>>> 2512b7ae44a91a65eb85ba0c08f5f1a979154069
 
 
 
