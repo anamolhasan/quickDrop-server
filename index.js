@@ -10,18 +10,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+// app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 app.use(express.json());
 
-<<<<<<< HEAD
-
-
 app.use(cors({
-<<<<<<< HEAD
-   origin: ["http://localhost:3000", "https://quick-drop-six.vercel.app"],
-=======
     origin: ["http://localhost:3000", "https://quick-drop-six.vercel.app"],
->>>>>>> main
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true
 }));
@@ -32,9 +25,8 @@ app.use(cors({
 const uri = process.env.DB_URL
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
-=======
-const uri = process.env.DB_URL;
->>>>>>> 49e210bcb33287613aad25df60f31b7b46562021
+
+
 const client = new MongoClient(uri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
 });
