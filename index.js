@@ -471,10 +471,6 @@ app.delete("/users/:id", verifyToken, authorizeRoles("admin"), async (req, res) 
 
 
 
-    
-
-
-
     console.log("Backend connected to MongoDB successfully!");
   } finally {
     // do not close client, server will keep running
