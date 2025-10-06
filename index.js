@@ -42,6 +42,10 @@ async function run() {
     const feedbackCollection = db.collection("feedback");
     const ridersCollection = db.collection("riders");
 
+   
+
+   
+
     /** ------------------ USERS ------------------ **/
 
     // Create user
@@ -127,7 +131,86 @@ async function run() {
 
     // POST /login/social
 
+<<<<<<< HEAD
     app.post("/login/social", async (req, res) => {
+=======
+
+
+
+app.post("/login/social", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await userCollection.findOne({ email });
+    if (!user) return res.status(404).send({ error: "User not found" });
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.send({ token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ error: "Server error" });
+  }
+});
+
+
+
+  // Update user profile (logged-in user)
+
+
+//   app.patch("/users/profile", verifyToken, async (req, res) => {
+//   const { name, email, phone, address } = req.body;
+//   const userEmail = req.user.email; // from your verifyToken middleware
+
+//   try {
+//     const updateFields = {};
+//     if (name) updateFields.name = name;
+//     if (email) updateFields.email = email;
+//     if (phone) updateFields.phone = phone;
+//     if (address) updateFields.address = address;
+
+//     const result = await userCollection.updateOne(
+//       { email: userEmail }, // use email instead of ObjectId
+//       { $set: updateFields }
+//     );
+
+//     if (result.modifiedCount === 0)
+//       return res.status(404).json({ success: false, message: "User not found or no changes made" });
+
+//     const updatedUser = await userCollection.findOne({ email: userEmail });
+
+//     res.json({ success: true, message: "Profile updated successfully", user: updatedUser });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, message: "Failed to update profile" });
+//   }
+// });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // Update user role (Admin only)
+    app.patch("/users/:id/role", verifyToken, authorizeRoles("admin"), async (req, res) => {
+      const { id } = req.params;
+      const { role } = req.body;
+      if (!role) return res.status(400).send({ error: "Role is required" });
+
+>>>>>>> 2512b7ae44a91a65eb85ba0c08f5f1a979154069
       try {
         const { email } = req.body;
         const user = await userCollection.findOne({ email });
@@ -212,6 +295,37 @@ async function run() {
       }
     });
 
+
+
+
+// DELETE user (Admin only)
+app.delete("/users/:id", verifyToken, authorizeRoles("admin"), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "Invalid user ID" });
+    }
+
+    const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ success: false, error: "Failed to delete user" });
+  }
+});
+
+
+
+
+
+
+
     /** ------------------ FEEDBACK ------------------ **/
 
     // GET all feedback
@@ -282,6 +396,8 @@ async function run() {
       }
     );
 
+
+
     // Get all riders (Admin only)
     app.get(
       "/riders",
@@ -293,6 +409,9 @@ async function run() {
       }
     );
 
+
+
+
     // Get active riders (Any logged-in user)
     app.get("/riders/active", verifyToken, async (req, res) => {
       const activeRiders = await ridersCollection
@@ -300,6 +419,9 @@ async function run() {
         .toArray();
       res.json(activeRiders);
     });
+
+
+
 
     // Update rider status (Admin only)
     app.put(
@@ -324,7 +446,10 @@ async function run() {
       }
     );
 
+
+
     // Delete rider (Admin only)
+<<<<<<< HEAD
     app.delete(
       "/riders/:id",
       verifyToken,
@@ -341,8 +466,20 @@ async function run() {
         res.json({ success: true, message: "Rider deleted successfully" });
       }
     );
+=======
+
+    app.delete("/riders/:id", verifyToken, authorizeRoles("admin"), async (req, res) => {
+      const { id } = req.params;
+      const result = await ridersCollection.deleteOne({ _id: new ObjectId(id) });
+      if (result.deletedCount === 0) return res.status(404).json({ success: false, message: "Rider not found" });
+      res.json({ success: true, message: "Rider deleted successfully" });
+    });
+>>>>>>> 2512b7ae44a91a65eb85ba0c08f5f1a979154069
+
+
 
     // Get single rider (Any logged-in user)
+  
     app.get("/riders/:id", verifyToken, async (req, res) => {
       const { id } = req.params;
       const rider = await ridersCollection.findOne({ _id: new ObjectId(id) });
@@ -352,6 +489,14 @@ async function run() {
           .json({ success: false, message: "Rider not found" });
       res.json(rider);
     });
+
+
+
+
+
+    
+
+
 
     console.log("Backend connected to MongoDB successfully!");
   } finally {
