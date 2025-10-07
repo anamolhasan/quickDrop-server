@@ -44,6 +44,7 @@ async function run() {
     const ridersCollection = db.collection("riders");
     const paymentsCollection = db.collection('payments')
     const parcelsCollection = db.collection('parcels')
+    const trackingsCollection = db.collection('trackings')
 
    
 
@@ -574,7 +575,7 @@ app.delete("/users/:id", verifyToken, authorizeRoles("admin"), async (req, res) 
 
 
       // GET: All parcels OR parcels by user (created_by), sorted by latest
-    app.get("/parcels",verifyToken, async (req, res) => {
+    app.get("/parcels", async (req, res) => {
       try {
         const {email, payment_status, delivery_status} = req.query
 
@@ -626,6 +627,30 @@ app.delete("/users/:id", verifyToken, authorizeRoles("admin"), async (req, res) 
     });
 
 
+
+
+    // ======== tracking -----------
+    app.post("/trackings", async (req, res) => {
+  try {
+    const update = req.body;
+
+    if (!update || typeof update !== "object") {
+      return res.status(400).json({ message: "Invalid payload" });
+    }
+
+    if (!update.tracking_id || !update.status) {
+      return res.status(400).json({ message: "tracking_id and status are required." });
+    }
+
+    update.timestamp = new Date();
+
+    const result = await trackingsCollection.insertOne(update);
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Failed to insert tracking:", error);
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
 
 
 
