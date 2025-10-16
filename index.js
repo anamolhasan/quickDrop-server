@@ -7,7 +7,7 @@ const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY);
 const port = process.env.PORT || 5000;
-
+// console.log(process.env.PAYMENT_GATEWAY_KEY)
 // Middleware
 // app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 app.use(express.json());
