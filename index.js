@@ -757,7 +757,7 @@ const bcrypt = require("bcrypt");
 // const jwt = require("jsonwebtoken"); // JWT REMOVED
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
-
+// console.log(process.env.PAYMENT_GATEWAY_KEY)
 // Middleware
 app.use(express.json());
 
