@@ -803,6 +803,9 @@ async function run() {
     const paymentsCollection = db.collection('payments');
     const parcelsCollection = db.collection('parcels');
     const trackingsCollection = db.collection('trackings');
+    const chatbotCollection = db.collection('chatbot_conversations');
+    const notificationsCollection = db.collection('notifications');
+    const offersCollection = db.collection('offers');
 
     /** =================== PUBLIC ROUTES =================== **/
 
@@ -814,6 +817,191 @@ async function run() {
         version: "No-JWT"
       });
     });
+
+
+  
+
+
+
+    // ✅ ADVANCED CHATBOT LOGIC
+app.post("/api/chatbot/message", async (req, res) => {
+  try {
+    const { message, userId, userEmail, conversationContext = {} } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Message is required" 
+      });
+    }
+
+    const userMessage = message.toLowerCase().trim();
+    let reply = '';
+    let context = conversationContext;
+    let actions = []; // Frontend-এ actions (buttons, links, etc.)
+
+    // 🔥 SMART ROUTE SUGGESTION
+    if (userMessage.includes('send') || userMessage.includes('parcel') || userMessage.includes('পার্সেল') || userMessage.includes('পাঠান')) {
+      reply = '🚚 **পার্সেল সেন্ড করতে চান?**\n\nআপনি সরাসরি আমাদের পার্সেল বুকিং পেজে যেতে পারেন:\n\n📦 **Quick & Easy Booking**\n\nঅথবা এখানেই তথ্য দিয়ে শুরু করতে পারেন!';
+      
+      actions = [
+        { type: 'link', text: '📦 পার্সেল বুক করুন', url: '/send-parcel' },
+        { type: 'button', text: '💡 দরদাম জানুন', action: 'pricing' },
+        { type: 'button', text: '🚗 পিকআপ সার্ভিস', action: 'pickup' }
+      ];
+    }
+
+    // 🔥 PRICING TABLE
+    else if (userMessage.includes('price') || userMessage.includes('cost') || userMessage.includes('দর') || userMessage.includes('কত') || context.showPricing) {
+      reply = `💰 **QuickDrop Pricing Table**\n
+📊 **পার্সেল টাইপ অনুযায়ী দর:**\n
+┌──────────────┬──────────┬──────────────┬─────────────────────┐
+│ 📦 Type      │ ⚖️ Weight │ 🏙️ Within City │ 🗺️ Outside City     │
+├──────────────┼──────────┼──────────────┼─────────────────────┤
+│ 📄 Document  │ Any      │ ৳60         │ ৳80                │
+│ 📦 Non-Doc   │ Up to 3kg│ ৳110        │ ৳150               │
+│ 📦 Non-Doc   │ >3kg     │ +৳40/kg     │ +৳40/kg +৳40 extra │
+└──────────────┴──────────┴──────────────┴─────────────────────┘\n
+💡 **দ্রুত দর জানতে:**\n• পার্সেল টাইপ\n• ওজন\n• পিকআপ/ডেলিভারি লোকেশন\n\nবলুন!`;
+
+      actions = [
+        { type: 'button', text: '📦 পার্সেল বুক করুন', url: '/send-parcel' },
+        { type: 'button', text: '🧮 দর ক্যালকুলেট করুন', action: 'calculate_price' },
+        { type: 'button', text: '📞 কন্টাক্ট', action: 'contact' }
+      ];
+      
+      context.showPricing = true;
+    }
+
+    // 🔥 DATABASE INTERACTION - Real Parcel Tracking
+    else if (userMessage.includes('track') || userMessage.includes('ট্র্যাক') || context.awaitingTracking) {
+      // Tracking number extract করার logic
+      const trackingMatch = userMessage.match(/(QD-)?(\d{6,9})/i);
+      
+      if (trackingMatch) {
+        const trackingNumber = trackingMatch[0].toUpperCase();
+        
+        // ✅ DATABASE QUERY - Real tracking info
+        try {
+          const parcel = await parcelsCollection.findOne({ 
+            tracking_id: trackingNumber 
+          });
+          
+          if (parcel) {
+            reply = `📦 **পার্সেল ট্র্যাকিং: ${trackingNumber}**\n\n` +
+                   `👤 **প্রেরক:** ${parcel.sender_name}\n` +
+                   `📍 **থেকে:** ${parcel.pickup_location}\n` +
+                   `🎯 **প্রতি:** ${parcel.delivery_location}\n` +
+                   `📊 **স্ট্যাটাস:** ${parcel.delivery_status || 'Processing'}\n` +
+                   `💰 **পেমেন্ট:** ${parcel.payment_status || 'Pending'}\n\n` +
+                   `🕒 **আপডেট:** ${new Date(parcel.createdAt).toLocaleDateString('bn-BD')}`;
+            
+            actions = [
+              { type: 'button', text: '🔄 লাইভ ট্র্যাকিং', url: `/tracking/${trackingNumber}` },
+              { type: 'button', text: '📞 সাপোর্ট', action: 'contact' }
+            ];
+          } else {
+            reply = `❌ **ট্র্যাকিং নম্বর পাওয়া যায়নি: ${trackingNumber}**\n\n` +
+                   'দয়া করে সঠিক ট্র্যাকিং নম্বর দিন (যেমন: QD-123456)';
+            context.awaitingTracking = true;
+          }
+        } catch (dbError) {
+          reply = '⚠️ **ডেটাবেসে সমস্যা!**\n\nদয়া করে পরে আবার চেষ্টা করুন।';
+        }
+      } else {
+        reply = '📦 **পার্সেল ট্র্যাকিং**\n\nআপনার ট্র্যাকিং নম্বর দিন:\n(যেমন: **QD-123456** বা **123456**)\n\nআমি বর্তমান স্ট্যাটাস দেখাবো 🔍';
+        context.awaitingTracking = true;
+      }
+    }
+
+    // 🔥 CALCULATE PRICE
+    else if (userMessage.includes('calculate') || userMessage.includes('ক্যালকুলেট') || context.calculatingPrice) {
+      reply = '🧮 **দর ক্যালকুলেটর**\n\nদর জানতে নিচের তথ্যগুলো দিন:\n\n1️⃣ **পার্সেল টাইপ?** (Document/Non-Document)\n2️⃣ **ওজন কত কেজি?**\n3️⃣ **লোকেশন?** (Within City/Outside City)\n\nপার্সেল টাইপ বলুন:';
+      
+      actions = [
+        { type: 'button', text: '📄 Document', action: 'set_type_document' },
+        { type: 'button', text: '📦 Non-Document', action: 'set_type_nondoc' }
+      ];
+      
+      context.calculatingPrice = true;
+      context.step = 'type';
+    }
+
+    // 🔥 PICKUP SERVICE
+    else if (userMessage.includes('pickup') || userMessage.includes('পিকআপ') || context.schedulingPickup) {
+      reply = '🚗 **পিকআপ সার্ভিস**\n\nপিকআপ বুক করতে:\n\n📍 **আপনার সম্পূর্ণ ঠিকানা**\n📅 **পছন্দের তারিখ**\n⏰ **সময়**\n📦 **পার্সেল ডিটেইলস**\n\nআপনার ঠিকানা লিখুন:';
+      
+      actions = [
+        { type: 'link', text: '📅 অনলাইন বুকিং', url: '/pickup' },
+        { type: 'button', text: '📞 কল করে বুক করুন', action: 'call_pickup' }
+      ];
+      
+      context.schedulingPickup = true;
+    }
+
+    // 🔥 CONTACT INFORMATION
+    else if (userMessage.includes('contact') || userMessage.includes('কল') || userMessage.includes('ফোন')) {
+      reply = `📞 **QuickDrop কন্টাক্ট**\n\n**হেল্পলাইন:** 09678-123456\n**ইমেইল:** support@quickdrop.com\n**ওয়েবসাইট:** www.quickdrop.com\n**ঠিকানা:** ঢাকা, বাংলাদেশ\n\n🕒 **24/7 সাপোর্ট Available**`;
+      
+      actions = [
+        { type: 'button', text: '📞 কল করুন', action: 'call_now' },
+        { type: 'link', text: '📧 ইমেইল করুন', url: 'mailto:support@quickdrop.com' },
+        { type: 'link', text: '🌐 ওয়েবসাইট', url: 'https://quickdrop.com' }
+      ];
+    }
+
+    // 🔥 DEFAULT HELP
+    else {
+      reply = `🤖 **QuickDrop Assistant**\n\nআমি কিভাবে সাহায্য করতে পারি?\n\n📦 **পার্সেল ট্র্যাকিং** - ট্র্যাকিং নম্বর দিয়ে\n💰 **দরদাম** - Pricing table দেখি\n🚚 **পার্সেল সেন্ড** - বুকিং শুরু করুন\n🚗 **পিকআপ** - বাসা থেকে সংগ্রহ\n📞 **সাপোর্ট** - কন্টাক্ট ইনফো`;
+      
+      actions = [
+        { type: 'button', text: '📦 Track Parcel', action: 'track' },
+        { type: 'button', text: '💰 Pricing', action: 'pricing' },
+        { type: 'button', text: '🚚 Send Parcel', action: 'send_parcel' },
+        { type: 'button', text: '📞 Contact', action: 'contact' }
+      ];
+    }
+
+    // MongoDB-তে conversation সেভ
+    try {
+      await chatbotCollection.insertOne({
+        userId: userId || 'anonymous',
+        userEmail: userEmail || '',
+        userMessage: message,
+        botReply: reply,
+        context: context,
+        actions: actions,
+        timestamp: new Date(),
+        ip: req.ip
+      });
+    } catch (dbError) {
+      console.log('Chatbot conversation save failed:', dbError);
+    }
+
+    res.json({ 
+      success: true, 
+      reply,
+      context: context,
+      actions: actions, // Frontend-এ buttons/links
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    res.status(500).json({ 
+      success: false, 
+      reply: '⚠️ **সিস্টেমে সাময়িক সমস্যা!**\n\nদয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।',
+      context: {},
+      actions: []
+    });
+  }
+});
+
+
+
+
+
+
 
     // ✅ CREATE USER - Public  
     app.post("/users", async (req, res) => {
@@ -903,108 +1091,6 @@ async function run() {
       }
     });
 
-    // ✅ SOCIAL LOGIN - Public (NO JWT)
-    // app.post("/login/social", async (req, res) => {
-    //   try {
-    //     const { email, name, photo } = req.body;
-        
-    //     if (!email) {
-    //       return res.status(400).json({ error: "Email is required" });
-    //     }
-
-    //     let user = await userCollection.findOne({ email });
-        
-    //     if (!user) {
-    //       // Create new user
-    //       const newUser = {
-    //         name: name || "User",
-    //         email,
-    //         password: null,
-    //         photo: photo || "https://i.ibb.co/2n8qPkw/default-avatar.png",
-    //         role: "user",
-    //         phone: "",
-    //         address: "",
-    //         createdAt: new Date(),
-    //       };
-          
-    //       const result = await userCollection.insertOne(newUser);
-    //       user = await userCollection.findOne({ _id: result.insertedId });
-    //     }
-
-    //     // ✅ NO JWT TOKEN - Just return user info
-    //     res.json({ 
-    //       success: true,
-    //       user: {
-    //         id: user._id,
-    //         name: user.name,
-    //         email: user.email,
-    //         role: user.role,
-    //         photo: user.photo,
-    //         phone: user.phone,
-    //         address: user.address
-    //       }
-    //     });
-    //   } catch (err) {
-    //     console.error(err);
-    //     res.status(500).json({ error: "Server error" });
-    //   }
-    // });
-
-
-// ✅ SOCIAL LOGIN - Public (NO JWT)
-// app.post("/login/social", async (req, res) => {
-//   try {
-//     const { email, name, photo } = req.body;
-    
-//     if (!email) {
-//       return res.status(400).json({ error: "Email is required" });
-//     }
-
-//     let user = await userCollection.findOne({ email });
-    
-//     if (!user) {
-//       // Create new user
-//       const newUser = {
-//         name: name || "User",
-//         email,
-//         password: null,
-//         photo: photo || "https://i.ibb.co/2n8qPkw/default-avatar.png",
-//         role: "user",
-//         phone: "",
-//         address: "",
-//         createdAt: new Date(),
-//       };
-      
-//       const result = await userCollection.insertOne(newUser);
-//       user = await userCollection.findOne({ _id: result.insertedId });
-//     }
-
-//     // ✅ JSON response with redirect URL
-//     res.json({ 
-//       success: true,
-//       redirectTo: process.env.NODE_ENV === 'production' 
-//         ? 'https://quick-drop-black.vercel.app'
-//         : 'http://localhost:3000',
-//       user: {
-//         id: user._id,
-//         name: user.name,
-//         email: user.email,
-//         role: user.role,
-//         photo: user.photo
-//       }
-//     });
-    
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ 
-//       success: false,
-//       error: "Social login failed",
-//       redirectTo: `${process.env.NODE_ENV === 'production' 
-//         ? 'https://quick-drop-black.vercel.app'
-//         : 'http://localhost:3000'}/login?error=social_login_failed`
-//     });
-//   }
-// });
     
 
 app.post("/login/social", async (req, res) => {
@@ -1463,6 +1549,276 @@ app.post("/login/social", async (req, res) => {
         res.status(500).json({ error: "Failed to delete feedback" });
       }
     });
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // post a offer by admin--------------------------------------------------
+
+
+  // ==================== OFFER MANAGEMENT API ====================
+
+// ✅ GET ALL OFFERS
+app.get("/api/offers", async (req, res) => {
+  try {
+    const offers = await offersCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    res.json({
+      success: true,
+      offers
+    });
+  } catch (error) {
+    console.error("Get offers error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch offers"
+    });
+  }
+});
+
+// ✅ GET ACTIVE OFFER
+app.get("/api/offers/active", async (req, res) => {
+  try {
+    const activeOffer = await offersCollection.findOne({
+      isActive: true,
+      isDeleted: { $ne: true }
+    });
+    
+    res.json({
+      success: true,
+      offer: activeOffer || null
+    });
+  } catch (error) {
+    console.error("Get active offer error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch active offer"
+    });
+  }
+});
+
+// ✅ CREATE NEW OFFER
+app.post("/api/offers", async (req, res) => {
+  try {
+    const { title, description, image, buttonText, buttonLink, expiresAt } = req.body;
+
+    if (!title || !description) {
+      return res.status(400).json({
+        success: false,
+        error: "Title and description are required"
+      });
+    }
+
+    // Deactivate all other offers
+    await offersCollection.updateMany(
+      { isActive: true },
+      { $set: { isActive: false } }
+    );
+
+    const newOffer = {
+      title,
+      description,
+      image: image || "",
+      buttonText: buttonText || "Learn More",
+      buttonLink: buttonLink || "#",
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      isActive: true,
+      isDeleted: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const result = await offersCollection.insertOne(newOffer);
+
+    res.status(201).json({
+      success: true,
+      message: "Offer created successfully",
+      offerId: result.insertedId
+    });
+  } catch (error) {
+    console.error("Create offer error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to create offer"
+    });
+  }
+});
+
+// ✅ UPDATE OFFER
+app.put("/api/offers/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, image, buttonText, buttonLink, expiresAt, isActive } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid offer ID"
+      });
+    }
+
+    const updateFields = {
+      updatedAt: new Date()
+    };
+
+    if (title) updateFields.title = title;
+    if (description) updateFields.description = description;
+    if (image !== undefined) updateFields.image = image;
+    if (buttonText) updateFields.buttonText = buttonText;
+    if (buttonLink) updateFields.buttonLink = buttonLink;
+    if (expiresAt) updateFields.expiresAt = new Date(expiresAt);
+
+    // If activating this offer, deactivate others
+    if (isActive === true) {
+      await offersCollection.updateMany(
+        { _id: { $ne: new ObjectId(id) }, isActive: true },
+        { $set: { isActive: false } }
+      );
+      updateFields.isActive = true;
+    } else if (isActive === false) {
+      updateFields.isActive = false;
+    }
+
+    const result = await offersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateFields }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Offer not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Offer updated successfully"
+    });
+  } catch (error) {
+    console.error("Update offer error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to update offer"
+    });
+  }
+});
+
+// ✅ DELETE OFFER (Soft Delete)
+app.delete("/api/offers/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid offer ID"
+      });
+    }
+
+    const result = await offersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { 
+        $set: { 
+          isDeleted: true,
+          isActive: false,
+          updatedAt: new Date()
+        } 
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "Offer not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Offer deleted successfully"
+    });
+  } catch (error) {
+    console.error("Delete offer error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete offer"
+    });
+  }
+});
+
+// ✅ TOGGLE OFFER STATUS
+app.patch("/api/offers/:id/toggle", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid offer ID"
+      });
+    }
+
+    const offer = await offersCollection.findOne({ _id: new ObjectId(id) });
+    if (!offer) {
+      return res.status(404).json({
+        success: false,
+        error: "Offer not found"
+      });
+    }
+
+    const newStatus = !offer.isActive;
+
+    // If activating, deactivate all other offers
+    if (newStatus) {
+      await offersCollection.updateMany(
+        { _id: { $ne: new ObjectId(id) }, isActive: true },
+        { $set: { isActive: false } }
+      );
+    }
+
+    const result = await offersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { isActive: newStatus, updatedAt: new Date() } }
+    );
+
+    res.json({
+      success: true,
+      message: `Offer ${newStatus ? 'activated' : 'deactivated'} successfully`,
+      isActive: newStatus
+    });
+  } catch (error) {
+    console.error("Toggle offer error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to toggle offer status"
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
 
     console.log("✅ Backend connected to MongoDB successfully!");
   } catch (error) {
