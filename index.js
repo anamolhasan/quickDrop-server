@@ -1403,7 +1403,7 @@ app.post("/login/social", async (req, res) => {
 
      app.get('/rider/parcels',  async (req, res) => {
         try {
-            const email = req.query.email;
+            const email = req?.query?.email;
 
             if (!email) {
                 return res.status(400).send({ message: 'Rider email is required' });
