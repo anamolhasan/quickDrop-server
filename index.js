@@ -754,10 +754,13 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const bcrypt = require("bcrypt");
+// import Stripe from "stripe";
+// const stripe = new Stripe(process.env.PAYMENT_GATEWAY_KEY);
+const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY);
 // const jwt = require("jsonwebtoken"); // JWT REMOVED
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
-// console.log(process.env.PAYMENT_GATEWAY_KEY)
+
 // Middleware
 app.use(express.json());
 
@@ -783,6 +786,7 @@ const client = new MongoClient(uri, {
 
 // NEW SIMPLE MIDDLEWARE (NO JWT)
 const { verifyToken, authorizeRoles } = require("./middleware/auth");
+const { default: Stripe } = require("stripe");
 
 async function run() {
   try {
@@ -1229,7 +1233,7 @@ app.post("/login/social", async (req, res) => {
         const newParcel = {
           ...req.body,
           createdAt: new Date(),
-          payment_status: "pending",
+          payment_status: "unpaid",
           delivery_status: "pending"
         };
         const result = await parcelsCollection.insertOne(newParcel);
@@ -1399,7 +1403,7 @@ app.post("/login/social", async (req, res) => {
 
      app.get('/rider/parcels',  async (req, res) => {
         try {
-            const email = req.query.email;
+            const email = req?.query?.email;
 
             if (!email) {
                 return res.status(400).send({ message: 'Rider email is required' });
