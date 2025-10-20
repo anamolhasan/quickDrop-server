@@ -1194,6 +1194,9 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
+
+
+
     // ✅ FEEDBACK - Public
     app.get("/feedback", async (req, res) => {
       try {
@@ -1215,6 +1218,9 @@ app.post("/login/social", async (req, res) => {
         res.status(500).json({ error: "Failed to add feedback" });
       }
     });
+
+
+
 
     // ✅ PARCELS - Public
     app.post("/parcels", async (req, res) => {
@@ -1273,6 +1279,8 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
+
+    // ================ Payment Routes ======================= //
     // ✅ PAYMENTS - Public (for payment creation)
     app.post("/payments", async (req, res) => {
       try {
@@ -1307,6 +1315,49 @@ app.post("/login/social", async (req, res) => {
         res.status(500).json({ message: "Failed to record payment" });
       }
     });
+
+
+    // ✅ GET PAYMENTS - Protected
+    app.get("/payments", verifyToken, async (req, res) => {
+      try {
+        const userEmail = req.query.email;
+        // ✅ FIXED: req.decoded → req.user
+        if (req.user.email !== userEmail) {
+          return res.status(403).json({ message: 'Forbidden access' });
+        }
+
+        const query = userEmail ? { email: userEmail } : {};
+        const options = { sort: { paid_at: -1 } };
+
+        const payments = await paymentsCollection.find(query, options).toArray();
+        res.json(payments);
+      } catch (error) {
+        console.error("Error fetching payment history:", error);
+        res.status(500).json({ message: "Failed to get payments" });
+      }
+    });
+
+    
+    // create payment intent api
+    app.post("/create-payment-intent", async (req, res) => {
+      const amountInCents = req.body.amountInCents;
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amountInCents, // Amount in cents
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+
+        res.json({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+
+
+
+
 
     // ✅ TRACKING - Public
     app.post("/trackings", async (req, res) => {
@@ -1366,25 +1417,11 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
-    // ✅ GET PAYMENTS - Protected
-    app.get("/payments", verifyToken, async (req, res) => {
-      try {
-        const userEmail = req.query.email;
-        // ✅ FIXED: req.decoded → req.user
-        if (req.user.email !== userEmail) {
-          return res.status(403).json({ message: 'Forbidden access' });
-        }
 
-        const query = userEmail ? { email: userEmail } : {};
-        const options = { sort: { paid_at: -1 } };
-        const payments = await paymentsCollection.find(query, options).toArray();
-        res.json(payments);
-      } catch (error) {
-        console.error("Error fetching payment history:", error);
-        res.status(500).json({ message: "Failed to get payments" });
-      }
-    });
 
+   
+  
+    // =============== Rider Route ================== //
     // ✅ RIDERS - Protected
     app.post("/riders",  async (req, res) => {
       try {
