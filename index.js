@@ -754,10 +754,13 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const bcrypt = require("bcrypt");
+// import Stripe from "stripe";
+// const stripe = new Stripe(process.env.PAYMENT_GATEWAY_KEY);
+const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY);
 // const jwt = require("jsonwebtoken"); // JWT REMOVED
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
-// console.log(process.env.PAYMENT_GATEWAY_KEY)
+
 // Middleware
 app.use(express.json());
 
@@ -783,6 +786,7 @@ const client = new MongoClient(uri, {
 
 // NEW SIMPLE MIDDLEWARE (NO JWT)
 const { verifyToken, authorizeRoles } = require("./middleware/auth");
+const { default: Stripe } = require("stripe");
 
 async function run() {
   try {
@@ -1194,6 +1198,9 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
+
+
+
     // ✅ FEEDBACK - Public
     app.get("/feedback", async (req, res) => {
       try {
@@ -1216,13 +1223,17 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
-    // ✅ PARCELS - Public
+
+
+
+    // ========✅ PARCELS - Public =============== //
+       //  POST : create a new parcel
     app.post("/parcels", async (req, res) => {
       try {
         const newParcel = {
           ...req.body,
           createdAt: new Date(),
-          payment_status: "pending",
+          payment_status: "unpaid",
           delivery_status: "pending"
         };
         const result = await parcelsCollection.insertOne(newParcel);
@@ -1231,8 +1242,85 @@ app.post("/login/social", async (req, res) => {
         console.error(error);
         res.status(500).json({ message: "Failed to create parcel" });
       }
-    });
+     });
 
+    app.patch("/parcels/:id/assign", async (req, res) => {
+            const parcelId = req.params.id;
+            const { riderId, riderName, riderEmail } = req.body;
+
+            try {
+                // Update parcel
+                await parcelsCollection.updateOne(
+                    { _id: new ObjectId(parcelId) },
+                    {
+                        $set: {
+                            delivery_status: "rider_assigned",
+                            assigned_rider_id: riderId,
+                            assigned_rider_email: riderEmail,
+                            assigned_rider_name: riderName,
+                        },
+                    }
+                );
+
+                // Update rider
+                await ridersCollection.updateOne(
+                    { _id: new ObjectId(riderId) },
+                    {
+                        $set: {
+                            work_status: "in_delivery",
+                        },
+                    }
+                );
+
+                res.send({ message: "Rider assigned" });
+            } catch (err) {
+                console.error(err);
+                res.status(500).send({ message: "Failed to assign rider" });
+            }
+      });
+
+    app.patch("/parcels/:id/status", async (req, res) => {
+            const parcelId = req.params.id;
+            const { status } = req.body;
+            const updatedDoc = {
+                delivery_status: status
+            }
+
+            if (status === 'in_transit') {
+                updatedDoc.picked_at = new Date().toISOString()
+            }
+            else if (status === 'delivered') {
+                updatedDoc.delivered_at = new Date().toISOString()
+            }
+
+            try {
+                const result = await parcelsCollection.updateOne(
+                    { _id: new ObjectId(parcelId) },
+                    {
+                        $set: updatedDoc
+                    }
+                );
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: "Failed to update status" });
+            }
+      });
+
+    app.patch("/parcels/:id/cashout", async (req, res) => {
+            const id = req.params.id;
+            const result = await parcelsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                {
+                    $set: {
+                        cashout_status: "cashed_out",
+                        cashed_out_at: new Date()
+                    }
+                }
+            );
+            res.send(result);
+      });
+
+ // GET: All parcels OR parcels by user (created_by), sorted by latest
     app.get("/parcels", async (req, res) => {
       try {
         const { email, payment_status, delivery_status } = req.query;
@@ -1256,7 +1344,7 @@ app.post("/login/social", async (req, res) => {
         res.status(500).json({ message: "Failed to get parcels" });
       }
     });
-
+       // GET: Get a specific parcel by ID
     app.get("/parcels/:id", async (req, res) => {
       try {
         const id = req.params.id;
@@ -1273,6 +1361,104 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
+   app.get('/parcels/delivery/status-count', async (req, res) => {
+              const pipeline = [
+                  {
+                      $group: {
+                          _id: '$delivery_status',
+                          count: {
+                              $sum: 1
+                          }
+                      }
+                  },
+                  {
+                      $project: {
+                          status: '$_id',
+                          count: 1,
+                          _id: 0
+                      }
+                  }
+              ];
+
+              const result = await parcelsCollection.aggregate(pipeline).toArray();
+              res.send(result);
+    })
+
+   app.delete("/parcels/:id", async (req, res) => {
+        try {
+          const id = req.params.id;
+
+          const result = await parcelsCollection.deleteOne({
+            _id: new ObjectId(id),
+          });
+
+          res.send(result);
+        } catch (error) {
+          console.error("Error deleting parcel:", error);
+          res.status(500).send({ message: "Failed to delete parcel" });
+        }
+    });
+
+     // GET: Get pending delivery tasks for a rider
+
+     app.get('/rider/parcels',  async (req, res) => {
+        try {
+            const email = req?.query?.email;
+
+            if (!email) {
+                return res.status(400).send({ message: 'Rider email is required' });
+            }
+
+            const query = {
+                assigned_rider_email: email,
+                delivery_status: { $in: ['rider_assigned', 'in_transit'] },
+            };
+
+            const options = {
+                sort: { creation_date: -1 }, // Newest first
+            };
+
+            const parcels = await parcelsCollection.find(query, options).toArray();
+            res.send(parcels);
+        } catch (error) {
+            console.error('Error fetching rider tasks:', error);
+            res.status(500).send({ message: 'Failed to get rider tasks' });
+        }
+    });
+
+      // GET: Load completed parcel deliveries for a rider
+    app.get('/rider/completed-parcels',  async (req, res) => {
+        try {
+            const email = req.query.email;
+
+            if (!email) {
+                return res.status(400).send({ message: 'Rider email is required' });
+            }
+
+            const query = {
+                assigned_rider_email: email,
+                delivery_status: {
+                    $in: ['delivered', 'service_center_delivered']
+                },
+            };
+
+            const options = {
+                sort: { creation_date: -1 }, // Latest first
+            };
+
+            const completedParcels = await parcelsCollection.find(query, options).toArray();
+
+            res.send(completedParcels);
+
+        } catch (error) {
+            console.error('Error loading completed parcels:', error);
+            res.status(500).send({ message: 'Failed to load completed deliveries' });
+        }
+    });
+
+
+
+    // ================ Payment Routes ======================= //
     // ✅ PAYMENTS - Public (for payment creation)
     app.post("/payments", async (req, res) => {
       try {
@@ -1308,7 +1494,48 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
-    // ✅ TRACKING - Public
+    // ✅ GET PAYMENTS - Protected
+    app.get("/payments", verifyToken, async (req, res) => {
+      try {
+        const userEmail = req.query.email;
+        // ✅ FIXED: req.decoded → req.user
+        if (req.user.email !== userEmail) {
+          return res.status(403).json({ message: 'Forbidden access' });
+        }
+
+        const query = userEmail ? { email: userEmail } : {};
+        const options = { sort: { paid_at: -1 } };
+
+        const payments = await paymentsCollection.find(query, options).toArray();
+        res.json(payments);
+      } catch (error) {
+        console.error("Error fetching payment history:", error);
+        res.status(500).json({ message: "Failed to get payments" });
+      }
+    });
+
+    // create payment intent api
+    app.post("/create-payment-intent", async (req, res) => {
+      const amountInCents = req.body.amountInCents;
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amountInCents, // Amount in cents
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+
+        res.json({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+
+
+
+
+
+    // =========✅ TRACKING - Public ========= //
     app.post("/trackings", async (req, res) => {
       try {
         const update = req.body;
@@ -1327,6 +1554,45 @@ app.post("/login/social", async (req, res) => {
         res.status(500).json({ message: "Internal server error", error: error.message });
       }
     });
+
+    app.get("/trackings/:trackingId", async (req, res) => {
+            const trackingId = req.params.trackingId;
+
+            const updates = await trackingsCollection
+                .find({ tracking_id: trackingId })
+                .sort({ timestamp: 1 }) // sort by time ascending
+                .toArray();
+
+            res.json(updates);
+       });
+
+     // tracking api
+     app.post("/tracking", async (req, res) => {
+          const {
+            tracking_id,
+            parcel_id,
+            status,
+            message,
+            updated_by = "",
+          } = req.body;
+
+          const log = {
+            tracking_id,
+            parcel_id: parcel_id ? new ObjectId(parcel_id) : undefined,
+            status,
+            message,
+            time: new Date(),
+            updated_by,
+          };
+
+          const result = await trackingsCollection.insertOne(log);
+          res.send({ success: true, insertedId: result.insertedId });
+       });
+
+
+
+
+
 
     /** =================== PROTECTED ROUTES =================== **/
 
@@ -1366,25 +1632,11 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
-    // ✅ GET PAYMENTS - Protected
-    app.get("/payments", verifyToken, async (req, res) => {
-      try {
-        const userEmail = req.query.email;
-        // ✅ FIXED: req.decoded → req.user
-        if (req.user.email !== userEmail) {
-          return res.status(403).json({ message: 'Forbidden access' });
-        }
 
-        const query = userEmail ? { email: userEmail } : {};
-        const options = { sort: { paid_at: -1 } };
-        const payments = await paymentsCollection.find(query, options).toArray();
-        res.json(payments);
-      } catch (error) {
-        console.error("Error fetching payment history:", error);
-        res.status(500).json({ message: "Failed to get payments" });
-      }
-    });
 
+   
+  
+    // =============== Rider Route ================== //
     // ✅ RIDERS - Protected
     app.post("/riders",  async (req, res) => {
       try {
@@ -1415,6 +1667,59 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
+   app.get("/riders/available", async (req, res) => {
+            const { district } = req.query;
+
+            try {
+                const riders = await ridersCollection
+                    .find({
+                        district,
+                        // status: { $in: ["approved", "active"] },
+                        // work_status: "available",
+                    })
+                    .toArray();
+
+                res.send(riders);
+            } catch (err) {
+                res.status(500).send({ message: "Failed to load riders" });
+            }
+        });
+
+    app.patch("/riders/:id/status", async (req, res) => {
+            const { id } = req.params;
+            const { status, email } = req.body;
+            const query = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set:
+                {
+                    status
+                }
+            }
+
+            try {
+                const result = await ridersCollection.updateOne(
+                    query, updateDoc
+
+                );
+
+                // update user role for accepting rider
+                if(status === 'active'){
+                  const userQuery = {email}
+                  const userUpdateDoc = {
+                    $set: {
+                      role: 'rider'
+                    }
+                  }
+                  const roleResult = await usersCollection.updateOne(userQuery, userUpdateDoc)
+                }
+                res.send(result);
+            } catch (err) {
+                res.status(500).send({ message: "Failed to update rider status" });
+            }
+        });
+
+
+    //  writing sharif ahmed siam ====*************/****/
     app.get("/riders/:id",  async (req, res) => {
       try {
         const { id } = req.params;
@@ -1427,6 +1732,11 @@ app.post("/login/social", async (req, res) => {
         res.status(500).json({ error: "Failed to fetch rider" });
       }
     });
+
+
+
+
+
 
     /** =================== ADMIN ROUTES =================== **/
 
