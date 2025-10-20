@@ -1229,7 +1229,7 @@ app.post("/login/social", async (req, res) => {
         const newParcel = {
           ...req.body,
           createdAt: new Date(),
-          payment_status: "pending",
+          payment_status: "unpaid",
           delivery_status: "pending"
         };
         const result = await parcelsCollection.insertOne(newParcel);
