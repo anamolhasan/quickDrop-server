@@ -754,10 +754,13 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const bcrypt = require("bcrypt");
+// import Stripe from "stripe";
+// const stripe = new Stripe(process.env.PAYMENT_GATEWAY_KEY);
+const stripe = require("stripe")(process.env.PAYMENT_GATEWAY_KEY);
 // const jwt = require("jsonwebtoken"); // JWT REMOVED
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
-// console.log(process.env.PAYMENT_GATEWAY_KEY)
+
 // Middleware
 app.use(express.json());
 
@@ -783,6 +786,7 @@ const client = new MongoClient(uri, {
 
 // NEW SIMPLE MIDDLEWARE (NO JWT)
 const { verifyToken, authorizeRoles } = require("./middleware/auth");
+const { default: Stripe } = require("stripe");
 
 async function run() {
   try {
