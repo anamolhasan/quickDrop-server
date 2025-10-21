@@ -1007,6 +1007,25 @@ app.post("/api/chatbot/message", async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // ✅ CREATE USER - Public  
     app.post("/users", async (req, res) => {
       try {
@@ -1201,6 +1220,28 @@ app.post("/login/social", async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // ✅ FEEDBACK - Public
     app.get("/feedback", async (req, res) => {
       try {
@@ -1226,6 +1267,26 @@ app.post("/login/social", async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // ========✅ PARCELS - Public =============== //
        //  POST : create a new parcel
     app.post("/parcels", async (req, res) => {
@@ -1244,67 +1305,249 @@ app.post("/login/social", async (req, res) => {
       }
      });
 
-    app.patch("/parcels/:id/assign", async (req, res) => {
-            const parcelId = req.params.id;
-            const { riderId, riderName, riderEmail } = req.body;
+    // app.patch("/parcels/:id/assign", async (req, res) => {
+    //         const parcelId = req.params.id;
+    //         const { riderId, riderName, riderEmail } = req.body;
 
-            try {
-                // Update parcel
-                await parcelsCollection.updateOne(
-                    { _id: new ObjectId(parcelId) },
-                    {
-                        $set: {
-                            delivery_status: "rider_assigned",
-                            assigned_rider_id: riderId,
-                            assigned_rider_email: riderEmail,
-                            assigned_rider_name: riderName,
-                        },
-                    }
-                );
+    //         try {
+    //             // Update parcel
+    //             await parcelsCollection.updateOne(
+    //                 { _id: new ObjectId(parcelId) },
+    //                 {
+    //                     $set: {
+    //                         delivery_status: "rider_assigned",
+    //                         assigned_rider_id: riderId,
+    //                         assigned_rider_email: riderEmail,
+    //                         assigned_rider_name: riderName,
+    //                     },
+    //                 }
+    //             );
 
-                // Update rider
+    //             // Update rider
+    //             await ridersCollection.updateOne(
+    //                 { _id: new ObjectId(riderId) },
+    //                 {
+    //                     $set: {
+    //                         work_status: "in_delivery",
+    //                     },
+    //                 }
+    //             );
+
+    //             res.send({ message: "Rider assigned" });
+    //         } catch (err) {
+    //             console.error(err);
+    //             res.status(500).send({ message: "Failed to assign rider" });
+    //         }
+    //   });
+
+
+
+
+// UPDATED: (added by siam) Assign rider to parcel - Fix work_status issue
+app.patch("/parcels/:id/assign", async (req, res) => {
+    const parcelId = req.params.id;
+    const { riderId, riderName, riderEmail } = req.body;
+
+    try {
+        // First check if rider exists and is available
+        const rider = await ridersCollection.findOne({ 
+            _id: new ObjectId(riderId),
+            status: "accepted"
+            // REMOVE work_status check to allow reassignment
+            // work_status: { $ne: "in_delivery" } 
+        });
+
+        if (!rider) {
+            return res.status(404).send({ message: "Rider not found or not available" });
+        }
+
+        // Update parcel
+        const parcelResult = await parcelsCollection.updateOne(
+            { _id: new ObjectId(parcelId) },
+            {
+                $set: {
+                    delivery_status: "rider_assigned",
+                    assigned_rider_id: new ObjectId(riderId),
+                    assigned_rider_email: riderEmail,
+                    assigned_rider_name: riderName,
+                    updatedAt: new Date()
+                },
+            }
+        );
+
+        // Update rider work status to in_delivery
+        const riderResult = await ridersCollection.updateOne(
+            { _id: new ObjectId(riderId) },
+            {
+                $set: {
+                    work_status: "in_delivery",
+                    updatedAt: new Date()
+                },
+            }
+        );
+
+        res.send({ 
+            message: "Rider assigned successfully",
+            parcelUpdated: parcelResult.modifiedCount > 0,
+            riderUpdated: riderResult.modifiedCount > 0
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to assign rider" });
+    }
+});
+
+    // app.patch("/parcels/:id/status", async (req, res) => {
+    //         const parcelId = req.params.id;
+    //         const { status } = req.body;
+    //         const updatedDoc = {
+    //             delivery_status: status
+    //         }
+
+    //         if (status === 'in_transit') {
+    //             updatedDoc.picked_at = new Date().toISOString()
+    //         }
+    //         else if (status === 'delivered') {
+    //             updatedDoc.delivered_at = new Date().toISOString()
+    //         }
+
+    //         try {
+    //             const result = await parcelsCollection.updateOne(
+    //                 { _id: new ObjectId(parcelId) },
+    //                 {
+    //                     $set: updatedDoc
+    //                 }
+    //             );
+    //             res.send(result);
+    //         } catch (error) {
+    //             res.status(500).send({ message: "Failed to update status" });
+    //         }
+    //   });
+
+
+  //(added by siam) PATCH: Update parcel status - UPDATED
+app.patch("/parcels/:id/status", async (req, res) => {
+    const parcelId = req.params.id;
+    const { status, riderEmail } = req.body; // riderEmail add করুন
+    
+    try {
+        const parcel = await parcelsCollection.findOne({ _id: new ObjectId(parcelId) });
+        if (!parcel) {
+            return res.status(404).send({ message: "Parcel not found" });
+        }
+
+        const updatedDoc = {
+            delivery_status: status,
+            updatedAt: new Date()
+        }
+
+        if (status === 'in_transit') {
+            updatedDoc.picked_at = new Date().toISOString();
+        }
+        else if (status === 'delivered') {
+            updatedDoc.delivered_at = new Date().toISOString();
+            
+            // Rider work status update when delivery completed
+            if (parcel.assigned_rider_id) {
                 await ridersCollection.updateOne(
-                    { _id: new ObjectId(riderId) },
-                    {
-                        $set: {
-                            work_status: "in_delivery",
-                        },
+                    { _id: new ObjectId(parcel.assigned_rider_id) },
+                    { 
+                        $set: { 
+                            work_status: "available",
+                            last_delivery: new Date()
+                        } 
                     }
                 );
-
-                res.send({ message: "Rider assigned" });
-            } catch (err) {
-                console.error(err);
-                res.status(500).send({ message: "Failed to assign rider" });
             }
-      });
+        }
 
-    app.patch("/parcels/:id/status", async (req, res) => {
-            const parcelId = req.params.id;
-            const { status } = req.body;
-            const updatedDoc = {
-                delivery_status: status
-            }
+        const result = await parcelsCollection.updateOne(
+            { _id: new ObjectId(parcelId) },
+            { $set: updatedDoc }
+        );
 
-            if (status === 'in_transit') {
-                updatedDoc.picked_at = new Date().toISOString()
-            }
-            else if (status === 'delivered') {
-                updatedDoc.delivered_at = new Date().toISOString()
-            }
+        res.send(result);
+    } catch (error) {
+        console.error("Error updating parcel status:", error);
+        res.status(500).send({ message: "Failed to update status" });
+    }
+});
 
-            try {
-                const result = await parcelsCollection.updateOne(
-                    { _id: new ObjectId(parcelId) },
-                    {
-                        $set: updatedDoc
+
+
+// NEW: (added by siam) API to reset rider work status (if needed)
+app.patch("/riders/reset-work-status", async (req, res) => {
+    try {
+        // Find riders who are in_delivery but have no active parcels
+        const ridersInDelivery = await ridersCollection.find({
+            work_status: "in_delivery"
+        }).toArray();
+
+        let resetCount = 0;
+
+        for (const rider of ridersInDelivery) {
+            // Check if rider has any active parcels
+            const activeParcels = await parcelsCollection.countDocuments({
+                assigned_rider_id: rider._id,
+                delivery_status: { $in: ['rider_assigned', 'in_transit'] }
+            });
+
+            // If no active parcels, reset work status to available
+            if (activeParcels === 0) {
+                await ridersCollection.updateOne(
+                    { _id: rider._id },
+                    { 
+                        $set: { 
+                            work_status: "available",
+                            updatedAt: new Date()
+                        } 
                     }
                 );
-                res.send(result);
-            } catch (error) {
-                res.status(500).send({ message: "Failed to update status" });
+                resetCount++;
             }
-      });
+        }
+
+        res.send({ 
+            message: `Work status reset for ${resetCount} riders`,
+            ridersReset: resetCount
+        });
+    } catch (error) {
+        console.error("Error resetting rider work status:", error);
+        res.status(500).send({ message: "Failed to reset work status" });
+    }
+});
+
+
+//(added by siam)  PATCH: Update rider work status
+app.patch('/riders/:id/work-status', async (req, res) => {
+    try {
+        const riderId = req.params.id;
+        const { work_status } = req.body;
+
+        const result = await ridersCollection.updateOne(
+            { _id: new ObjectId(riderId) },
+            { 
+                $set: { 
+                    work_status: work_status,
+                    updatedAt: new Date()
+                } 
+            }
+        );
+
+        if (result.modifiedCount === 0) {
+            return res.status(404).send({ message: 'Rider not found' });
+        }
+
+        res.send({ message: 'Work status updated successfully' });
+    } catch (error) {
+        console.error('Error updating rider work status:', error);
+        res.status(500).send({ message: 'Failed to update work status' });
+    }
+});
+
+
+
+
 
     app.patch("/parcels/:id/cashout", async (req, res) => {
             const id = req.params.id;
@@ -1399,32 +1642,133 @@ app.post("/login/social", async (req, res) => {
         }
     });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
      // GET: Get pending delivery tasks for a rider
 
-     app.get('/rider/parcels',  async (req, res) => {
-        try {
-            const email = req?.query?.email;
+    //  app.get('/rider/parcels',  async (req, res) => {
+    //     try {
+    //         const email = req?.query?.email;
 
-            if (!email) {
-                return res.status(400).send({ message: 'Rider email is required' });
-            }
+    //         if (!email) {
+    //             return res.status(400).send({ message: 'Rider email is required' });
+    //         }
 
-            const query = {
-                assigned_rider_email: email,
-                delivery_status: { $in: ['rider_assigned', 'in_transit'] },
-            };
+    //         const query = {
+    //             assigned_rider_email: email,
+    //             delivery_status: { $in: ['rider_assigned', 'in_transit'] },
+    //         };
 
-            const options = {
-                sort: { creation_date: -1 }, // Newest first
-            };
+    //         const options = {
+    //             sort: { creation_date: -1 }, // Newest first
+    //         };
 
-            const parcels = await parcelsCollection.find(query, options).toArray();
-            res.send(parcels);
-        } catch (error) {
-            console.error('Error fetching rider tasks:', error);
-            res.status(500).send({ message: 'Failed to get rider tasks' });
+    //         const parcels = await parcelsCollection.find(query, options).toArray();
+    //         res.send(parcels);
+    //     } catch (error) {
+    //         console.error('Error fetching rider tasks:', error);
+    //         res.status(500).send({ message: 'Failed to get rider tasks' });
+    //     }
+    // });
+
+
+   //(added by siam)  GET: Get pending delivery tasks for a rider - UPDATED
+app.get('/rider/parcels', async (req, res) => {
+    try {
+        const email = req?.query?.email;
+
+        if (!email) {
+            return res.status(400).send({ message: 'Rider email is required' });
         }
-    });
+
+        const query = {
+            assigned_rider_email: email,
+            delivery_status: { $in: ['rider_assigned', 'in_transit'] },
+        };
+
+        const options = {
+            sort: { createdAt: -1 }, // Use createdAt instead of creation_date
+        };
+
+        // Select only necessary fields for better performance
+        const projection = {
+            tracking_id: 1,
+            title: 1,
+            type: 1,
+            weight: 1,
+            sender_name: 1,
+            sender_contact: 1,
+            sender_region: 1,
+            sender_center: 1,
+            sender_address: 1,
+            pickup_instruction: 1,
+            receiver_name: 1,
+            receiver_contact: 1,
+            receiver_region: 1,
+            receiver_center: 1,
+            receiver_address: 1,
+            delivery_instruction: 1,
+            cost: 1,
+            payment_status: 1,
+            delivery_status: 1,
+            assigned_rider_name: 1,
+            assigned_rider_email: 1,
+            createdAt: 1,
+            creation_date: 1,
+            picked_at: 1,
+            delivered_at: 1
+        };
+
+        const parcels = await parcelsCollection.find(query, options).project(projection).toArray();
+        res.send(parcels);
+    } catch (error) {
+        console.error('Error fetching rider tasks:', error);
+        res.status(500).send({ message: 'Failed to get rider tasks' });
+    }
+});
+
+
+
 
       // GET: Load completed parcel deliveries for a rider
     app.get('/rider/completed-parcels',  async (req, res) => {
@@ -1594,6 +1938,117 @@ app.post("/login/social", async (req, res) => {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     
+// (added by siam)  Backend-এ available riders API update করুন
+app.get("/riders/available", async (req, res) => {
+  try {
+    const { region } = req.query;
+    
+    let query = {
+      status: "accepted",
+      work_status: { $ne: "in_delivery" }
+    };
+
+    // যদি region দেয়া থাকে, শুধু সেই region এর riders show করবে
+    if (region) {
+      query.division = region;
+    }
+
+    const availableRiders = await ridersCollection.find(query).toArray();
+    res.json(availableRiders);
+  } catch (error) {
+    console.error("Error fetching available riders:", error);
+    res.status(500).json({ message: "Failed to get available riders" });
+  }
+});
+
+
+
+// (added by siam)  GET: Rider delivery statistics
+app.get('/rider/stats', async (req, res) => {
+    try {
+        const email = req.query.email;
+
+        if (!email) {
+            return res.status(400).send({ message: 'Rider email is required' });
+        }
+
+        // Current active deliveries
+        const activeDeliveries = await parcelsCollection.find({
+            assigned_rider_email: email,
+            delivery_status: { $in: ['rider_assigned', 'in_transit'] }
+        }).toArray();
+
+        // Completed deliveries
+        const completedDeliveries = await parcelsCollection.find({
+            assigned_rider_email: email,
+            delivery_status: 'delivered'
+        }).toArray();
+
+        // Total earnings (only delivered parcels)
+        const totalEarnings = completedDeliveries.reduce((sum, parcel) => sum + (parcel.cost || 0), 0);
+
+        res.send({
+            totalAssigned: activeDeliveries.length + completedDeliveries.length,
+            active: activeDeliveries.length,
+            completed: completedDeliveries.length,
+            totalEarnings: totalEarnings,
+            assigned: activeDeliveries.filter(p => p.delivery_status === 'rider_assigned').length,
+            inTransit: activeDeliveries.filter(p => p.delivery_status === 'in_transit').length
+        });
+
+    } catch (error) {
+        console.error('Error fetching rider stats:', error);
+        res.status(500).send({ message: 'Failed to get rider statistics' });
+    }
+});
+
+
+
+
     /** =================== PROTECTED ROUTES =================== **/
 
     // ✅ UPDATE USER PROFILE - Protected
@@ -1667,23 +2122,49 @@ app.post("/login/social", async (req, res) => {
       }
     });
 
-   app.get("/riders/available", async (req, res) => {
-            const { district } = req.query;
+   // UPDATED: Get available riders with better logic
+app.get("/riders/available", async (req, res) => {
+    try {
+        const { region, parcelId } = req.query;
+        
+        let query = {
+            status: "accepted"
+            // Remove work_status filter to show all accepted riders
+            // work_status: { $ne: "in_delivery" }
+        };
 
-            try {
-                const riders = await ridersCollection
-                    .find({
-                        district,
-                        // status: { $in: ["approved", "active"] },
-                        // work_status: "available",
-                    })
-                    .toArray();
+        // যদি region দেয়া থাকে, শুধু সেই region এর riders show করবে
+        if (region && region !== 'all') {
+            query.division = region;
+        }
 
-                res.send(riders);
-            } catch (err) {
-                res.status(500).send({ message: "Failed to load riders" });
+        const availableRiders = await ridersCollection.find(query).toArray();
+
+        // যদি parcelId দেয়া থাকে, check করুন rider already assigned কিনা
+        if (parcelId) {
+            const parcel = await parcelsCollection.findOne({ 
+                _id: new ObjectId(parcelId) 
+            });
+            
+            if (parcel && parcel.assigned_rider_id) {
+                // Already assigned rider কে list এর প্রথমে show করুন
+                const assignedRiderIndex = availableRiders.findIndex(
+                    rider => rider._id.toString() === parcel.assigned_rider_id.toString()
+                );
+                
+                if (assignedRiderIndex > -1) {
+                    const [assignedRider] = availableRiders.splice(assignedRiderIndex, 1);
+                    availableRiders.unshift(assignedRider);
+                }
             }
-        });
+        }
+
+        res.json(availableRiders);
+    } catch (error) {
+        console.error("Error fetching available riders:", error);
+        res.status(500).json({ message: "Failed to get available riders" });
+    }
+});
 
     app.patch("/riders/:id/status", async (req, res) => {
             const { id } = req.params;
