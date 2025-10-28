@@ -767,9 +767,10 @@ app.use(express.json());
 app.use(cors({
     origin: [
         "http://localhost:3000",
-        "https://quick-drop-black.vercel.app", 
-        "https://quick-drop-*.vercel.app",
-        "https://quick-drop-bwek4q6t0-siamahmeddhks-projects.vercel.app"
+        // "https://quick-drop-black.vercel.app", 
+        "https://quick-drop-six.vercel.app",
+        // "https://quick-drop-*.vercel.app",
+        // "https://quick-drop-bwek4q6t0-siamahmeddhks-projects.vercel.app"
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
@@ -821,9 +822,6 @@ async function run() {
         version: "No-JWT"
       });
     });
-
-
-  
 
 
 
@@ -1004,28 +1002,6 @@ app.post("/api/chatbot/message", async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // ✅ CREATE USER - Public  
     app.post("/users", async (req, res) => {
       try {
@@ -1186,9 +1162,6 @@ app.post("/login/social", async (req, res) => {
 
 
 
-
-
-
     // ✅ GET USER BY EMAIL - Public
     app.get("/users/:email", async (req, res) => {
       try {
@@ -1219,29 +1192,6 @@ app.post("/login/social", async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // ✅ FEEDBACK - Public
     app.get("/feedback", async (req, res) => {
       try {
@@ -1263,25 +1213,6 @@ app.post("/login/social", async (req, res) => {
         res.status(500).json({ error: "Failed to add feedback" });
       }
     });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1645,45 +1576,6 @@ app.patch('/riders/:id/work-status', async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
      // GET: Get pending delivery tasks for a rider
 
     //  app.get('/rider/parcels',  async (req, res) => {
@@ -1932,52 +1824,6 @@ app.get('/rider/parcels', async (req, res) => {
           const result = await trackingsCollection.insertOne(log);
           res.send({ success: true, insertedId: result.insertedId });
        });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2344,15 +2190,6 @@ app.get("/riders/available", async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
   // post a offer by admin--------------------------------------------------
 
 
@@ -2598,13 +2435,6 @@ app.patch("/api/offers/:id/toggle", async (req, res) => {
     });
   }
 });
-
-
-
-
-
-
-
 
 
 
