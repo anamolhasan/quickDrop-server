@@ -1048,47 +1048,89 @@ app.post("/api/chatbot/message", async (req, res) => {
     });
 
     // ✅ LOGIN - Public (NO JWT)
+    // app.post("/login", async (req, res) => {
+    //   try {
+    //     const { email, password } = req.body;
+    //     if (!email || !password) {
+    //       return res.status(400).json({ error: "Email and password required" });
+    //     }
+
+    //     const user = await userCollection.findOne({ email });
+    //     if (!user) {
+    //       return res.status(400).json({ error: "Invalid email or password" });
+    //     }
+
+    //     // Check if user has password
+    //     if (!user.password) {
+    //       return res.status(400).json({ error: "Please use social login for this account" });
+    //     }
+
+    //     const isPasswordValid = await bcrypt.compare(password, user.password);
+    //     if (!isPasswordValid) {
+    //       return res.status(401).json({ error: "Invalid email or password" });
+    //     }
+
+    //     // ✅ NO JWT TOKEN - Just return user info
+    //     res.json({
+    //       success: true,
+    //       message: "Login success",
+    //       user: {
+    //         id: user._id,
+    //         name: user.name,
+    //         email: user.email,
+    //         role: user.role,
+    //         photo: user.photo,
+    //         phone: user.phone,
+    //         address: user.address
+    //       },
+    //     });
+    //   } catch (error) {
+    //     console.error(error);
+    //     res.status(500).json({ error: "Login failed" });
+    //   }
+    // });
+
     app.post("/login", async (req, res) => {
-      try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-          return res.status(400).json({ error: "Email and password required" });
-        }
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.json({ success: false, error: "Email and password required" });
+    }
 
-        const user = await userCollection.findOne({ email });
-        if (!user) {
-          return res.status(400).json({ error: "Invalid email or password" });
-        }
+    const user = await userCollection.findOne({ email });
+    if (!user) {
+      return res.json({ success: false, error: "Invalid email or password" });
+    }
 
-        // Check if user has password
-        if (!user.password) {
-          return res.status(400).json({ error: "Please use social login for this account" });
-        }
+    if (!user.password) {
+      return res.json({ success: false, error: "Please use social login for this account" });
+    }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-          return res.status(401).json({ error: "Invalid email or password" });
-        }
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.json({ success: false, error: "Invalid email or password" });
+    }
 
-        // ✅ NO JWT TOKEN - Just return user info
-        res.json({
-          success: true,
-          message: "Login success",
-          user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            photo: user.photo,
-            phone: user.phone,
-            address: user.address
-          },
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Login failed" });
-      }
+    // ✅ Return success with user info
+    return res.json({
+      success: true,
+      message: "Login success",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        photo: user.photo,
+        phone: user.phone,
+        address: user.address
+      },
     });
+  } catch (error) {
+    console.error(error);
+    return res.json({ success: false, error: "Login failed" });
+  }
+});
+
 
     
 
